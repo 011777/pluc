@@ -1,0 +1,54 @@
+import { useEffect, useState } from "react";
+import { LiveKitRoom, VideoConference } from "@livekit/components-react";
+import "@livekit/components-styles";
+import { getAuth } from "firebase/auth";
+import { LIVEKIT_URL } from "../config/livekit";
+
+export default function Viewer({ onLeave }) {
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const user = getAuth().currentUser;
+      if (!user) return;
+
+      const idToken = await user.getIdToken();
+
+      const res = await fetch("http://localhost:3001/livekit-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          roomName: "pluc-room",
+          userName: `viewer-${user.uid}`,
+          role: "viewer",
+        }),
+      });
+
+      const data = await res.json();
+      setToken(data.token);
+      setLoading(false);
+    };
+
+    fetchToken();
+  }, []);
+
+  if (loading) return <p>Joining stream…</p>;
+  if (!token) return <p>Unable to join stream</p>;
+
+  return (
+    <LiveKitRoom
+      token={token}
+      serverUrl={LIVEKIT_URL}
+      connect
+      video={false}
+      audio={false}
+      onDisconnected={onLeave}
+    >
+      <VideoConference />
+    </LiveKitRoom>
+  );
+}
